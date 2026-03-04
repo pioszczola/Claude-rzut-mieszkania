@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rzut Mieszkania</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #f0ede8;
+    --paper: #faf9f6;
+    --ink: #1a1816;
+    --wall: #2c2825;
+    --accent: #c8501a;
+    --grid: #d4cfc8;
+    --panel: #e8e4de;
+    --room-fill: rgba(200,80,26,0.06);
+    --door-c: #7a6e5f;
+    --window-c: #5b8fa8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--ink);
+    color: var(--bg);
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0.9;
+  }
+
+  .header-tools {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .tool-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 5px 10px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: var(--bg);
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .tool-btn:hover, .tool-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .tool-btn.danger:hover {
+    background: #c0392b;
+    border-color: #c0392b;
+  }
+
+  .sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--paper);
+    border-right: 1px solid var(--grid);
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sidebar h3 {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .input-group label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #6b6560;
+    letter-spacing: 0.03em;
+  }
+
+  .input-group input, .input-group select {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 6px 8px;
+    border: 1px solid var(--grid);
+    background: white;
+    color: var(--ink);
+    outline: none;
+    width: 100%;
+  }
+
+  .input-group input:focus, .input-group select:focus {
+    border-color: var(--accent);
+  }
+
+  .scale-display {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    background: var(--panel);
+    padding: 8px;
+    text-align: center;
+    border: 1px solid var(--grid);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .room-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    background: var(--panel);
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.1s;
+  }
+
+  .room-item:hover { border-color: var(--accent); }
+  .room-item.selected { border-color: var(--accent); background: rgba(200,80,26,0.08); }
+
+  .room-item .del-room {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+
+  .room-item .del-room:hover { color: var(--accent); }
+
+  .info-box {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    padding: 10px;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #5a5550;
+  }
+
+  .info-box b { color: var(--ink); }
+
+  /* Canvas area */
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    cursor: crosshair;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    image-rendering: pixelated;
+  }
+
+  #grid-canvas { z-index: 1; pointer-events: none; }
+  #main-canvas { z-index: 2; }
+
+  .coords-bar {
+    position: absolute;
+    bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26,24,22,0.85);
+    color: #f0ede8;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 4px 12px;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 0.05em;
+  }
+
+  .zoom-bar {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    display: flex;
+    gap: 4px;
+    z-index: 10;
+  }
+
+  .zoom-btn {
+    width: 28px; height: 28px;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: 'Space Mono', monospace;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s;
+  }
+
+  .zoom-btn:hover { background: var(--accent); }
+
+  .legend {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(250,249,246,0.92);
+    border: 1px solid var(--grid);
+    padding: 10px 12px;
+    font-size: 11px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .legend-swatch { width: 20px; height: 4px; }
+  .legend-swatch.wall { background: var(--wall); height: 6px; }
+  .legend-swatch.door { background: var(--door-c); }
+  .legend-swatch.window { background: var(--window-c); }
+  .legend-swatch.dim { background: var(--accent); height: 2px; }
+
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(26,24,22,0.7);
+    z-index: 100;
+    align-items: center; justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--paper);
+    border: 1px solid var(--grid);
+    padding: 24px;
+    width: 320px;
+    max-width: 90vw;
+  }
+
+  .modal h2 {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    color: var(--accent);
+  }
+
+  .modal .input-group { margin-bottom: 10px; }
+
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+
+  .modal-btns button {
+    flex: 1;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 8px;
+    border: 1px solid var(--grid);
+    cursor: pointer;
+    background: white;
+    letter-spacing: 0.05em;
+  }
+
+  .modal-btns button.primary {
+    background: var(--ink);
+    color: white;
+    border-color: var(--ink);
+  }
+
+  .modal-btns button:hover { border-color: var(--accent); }
+  .modal-btns button.primary:hover { background: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✦ Rzut Mieszkania</h1>
+  <div class="header-tools">
+    <button class="tool-btn active" id="btn-wall" onclick="setTool('wall')">🧱 Ściana</button>
+    <button class="tool-btn" id="btn-door" onclick="setTool('door')">🚪 Drzwi</button>
+    <button class="tool-btn" id="btn-window" onclick="setTool('window')">🪟 Okno</button>
+    <button class="tool-btn" id="btn-room" onclick="setTool('room')">🏠 Pomieszczenie</button>
+    <div class="sep"></div>
+    <button class="tool-btn" id="btn-select" onclick="setTool('select')">↖ Wybierz</button>
+    <button class="tool-btn" id="btn-erase" onclick="setTool('erase')">✕ Usuń</button>
+    <div class="sep"></div>
+    <button class="tool-btn" onclick="exportPNG()">⬇ Eksport PNG</button>
+    <button class="tool-btn danger" onclick="clearAll()">⬜ Wyczyść</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div>
+      <h3>Skala & Siatka</h3>
+      <div class="input-group">
+        <label>1 kratka = (cm)</label>
+        <input type="number" id="grid-cm" value="25" min="5" max="500" step="5" onchange="updateScale()">
+      </div>
+      <div class="input-group">
+        <label>Rozmiar kratki (px)</label>
+        <input type="number" id="grid-px" value="20" min="10" max="60" step="5" onchange="updateScale()">
+      </div>
+      <div class="scale-display" id="scale-display">1 : 25</div>
+    </div>
+
+    <div>
+      <h3>Grubość ściany</h3>
+      <div class="input-group">
+        <label>Grubość (cm)</label>
+        <input type="number" id="wall-thick" value="25" min="5" max="100" step="5">
+      </div>
+    </div>
+
+    <div>
+      <h3>Pomieszczenia</h3>
+      <div id="room-list" class="room-list"></div>
+      <br>
+      <button class="tool-btn" style="width:100%;color:var(--ink);border-color:var(--grid);" onclick="openRoomModal()">+ Dodaj pomieszczenie</button>
+    </div>
+
+    <div>
+      <h3>Wymiary zaznaczonego</h3>
+      <div class="info-box" id="sel-info">
+        Kliknij element, aby zobaczyć wymiary.
+      </div>
+    </div>
+
+    <div>
+      <h3>Pomoc</h3>
+      <div class="info-box">
+        <b>Ściana:</b> kliknij start → koniec<br>
+        <b>Shift:</b> rysuj po prostej<br>
+        <b>Scroll:</b> zoom<br>
+        <b>Środkowy przycisk/Space+drag:</b> przesuwanie<br>
+        <b>Drzwi/Okno:</b> kliknij na ścianę
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="grid-canvas"></canvas>
+    <canvas id="main-canvas"></canvas>
+    <div class="coords-bar" id="coords-bar">x: 0 cm &nbsp;|&nbsp; y: 0 cm</div>
+    <div class="zoom-bar">
+      <button class="zoom-btn" onclick="zoom(1.2)">+</button>
+      <button class="zoom-btn" onclick="zoom(1/1.2)">−</button>
+      <button class="zoom-btn" onclick="resetView()" title="Reset widoku">⌂</button>
+    </div>
+    <div class="legend">
+      <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;color:#aaa;">Legenda</div>
+      <div class="legend-item"><div class="legend-swatch wall"></div> Ściana</div>
+      <div class="legend-item"><div class="legend-swatch door"></div> Drzwi</div>
+      <div class="legend-item"><div class="legend-swatch window"></div> Okno</div>
+      <div class="legend-item"><div class="legend-swatch dim"></div> Wymiar</div>
+    </div>
+  </div>
+</div>
+
+<!-- Room modal -->
+<div class="modal-overlay" id="room-modal">
+  <div class="modal">
+    <h2>Dodaj pomieszczenie</h2>
+    <div class="input-group">
+      <label>Nazwa</label>
+      <input type="text" id="room-name" placeholder="np. Salon" value="Salon">
+    </div>
+    <div class="input-group">
+      <label>Kolor</label>
+      <input type="color" id="room-color" value="#c8501a" style="height:32px;padding:2px;">
+    </div>
+    <p style="font-size:11px;color:#888;margin-top:6px;">Po kliknięciu OK, kliknij na rzucie, aby umieścić etykietę pomieszczenia.</p>
+    <div class="modal-btns">
+      <button onclick="closeRoomModal()">Anuluj</button>
+      <button class="primary" onclick="confirmRoom()">OK – umieść</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const wrap = document.getElementById('canvas-wrap');
+const gridCanvas = document.getElementById('grid-canvas');
+const mainCanvas = document.getElementById('main-canvas');
+const gctx = gridCanvas.getContext('2d');
+const ctx = mainCanvas.getContext('2d');
+
+// State
+let tool = 'wall';
+let gridCm = 25;
+let gridPx = 20;
+let scaleFactor = 1; // zoom
+let panX = 0, panY = 0;
+let wallThick = 25; // cm
+
+let walls = [];
+let doors = [];
+let windows_ = [];
+let rooms = [];
+let labels = [];
+
+let drawing = false;
+let drawStart = null;
+let mousePos = { x: 0, y: 0 };
+let selectedEl = null;
+
+let isPanning = false;
+let panStart = null;
+let spaceDown = false;
+
+// Pending room placement
+let pendingRoom = null;
+
+function resize() {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  gridCanvas.width = mainCanvas.width = W;
+  gridCanvas.height = mainCanvas.height = H;
+  drawAll();
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+// Convert screen to world (cm units)
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - panX) / scaleFactor / gridPx * gridCm,
+    y: (sy - panY) / scaleFactor / gridPx * gridCm
+  };
+}
+
+function worldToScreen(wx, wy) {
+  return {
+    x: wx / gridCm * gridPx * scaleFactor + panX,
+    y: wy / gridCm * gridPx * scaleFactor + panY
+  };
+}
+
+function snapToGrid(cm) {
+  return Math.round(cm / 5) * 5;
+}
+
+function setTool(t) {
+  tool = t;
+  drawing = false;
+  drawStart = null;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn-' + t);
+  if (btn) btn.classList.add('active');
+  mainCanvas.style.cursor = t === 'select' ? 'default' : t === 'erase' ? 'crosshair' : 'crosshair';
+  selectedEl = null;
+  updateSelInfo();
+  drawAll();
+}
+
+function updateScale() {
+  gridCm = parseFloat(document.getElementById('grid-cm').value) || 25;
+  gridPx = parseFloat(document.getElementById('grid-px').value) || 20;
+  document.getElementById('scale-display').textContent = `1 kratka = ${gridCm} cm`;
+  drawAll();
+}
+
+// ---- Drawing ----
+
+function drawGrid() {
+  const W = gridCanvas.width, H = gridCanvas.height;
+  gctx.clearRect(0, 0, W, H);
+  const step = gridPx * scaleFactor;
+  const offX = ((panX % step) + step) % step;
+  const offY = ((panY % step) + step) % step;
+
+  gctx.strokeStyle = '#d8d3cc';
+  gctx.lineWidth = 0.5;
+
+  for (let x = offX; x < W; x += step) {
+    gctx.beginPath(); gctx.moveTo(x, 0); gctx.lineTo(x, H); gctx.stroke();
+  }
+  for (let y = offY; y < H; y += step) {
+    gctx.beginPath(); gctx.moveTo(0, y); gctx.lineTo(W, y); gctx.stroke();
+  }
+
+  // Origin cross
+  const o = worldToScreen(0, 0);
+  gctx.strokeStyle = '#b0a89e';
+  gctx.lineWidth = 1;
+  gctx.beginPath(); gctx.moveTo(o.x - 8, o.y); gctx.lineTo(o.x + 8, o.y); gctx.stroke();
+  gctx.beginPath(); gctx.moveTo(o.x, o.y - 8); gctx.lineTo(o.x, o.y + 8); gctx.stroke();
+}
+
+function drawAll() {
+  drawGrid();
+  const W = mainCanvas.width, H = mainCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Rooms (colored fills)
+  for (const r of rooms) {
+    const p = worldToScreen(r.x, r.y);
+    ctx.fillStyle = r.color + '20';
+    ctx.font = `bold ${12 * scaleFactor}px DM Sans`;
+    ctx.fillText(r.name, p.x, p.y);
+    if (selectedEl === r) {
+      ctx.strokeStyle = '#c8501a';
+      ctx.lineWidth = 1;
+      ctx.strokeText(r.name, p.x, p.y);
+    }
+  }
+
+  // Walls
+  const thick = (wallThick / gridCm) * gridPx * scaleFactor;
+
+  for (const w of walls) {
+    const a = worldToScreen(w.x1, w.y1);
+    const b = worldToScreen(w.x2, w.y2);
+    ctx.lineCap = 'square';
+    ctx.lineWidth = thick;
+    ctx.strokeStyle = selectedEl === w ? '#c8501a' : '#2c2825';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+    // Dimension
+    drawDimension(ctx, a, b, w.x1, w.y1, w.x2, w.y2);
+  }
+
+  // Doors
+  for (const d of doors) {
+    drawDoor(d);
+  }
+
+  // Windows
+  for (const wi of windows_) {
+    drawWindow(wi);
+  }
+
+  // Preview while drawing
+  if (drawing && drawStart) {
+    let end = snapAngle(drawStart, { ...mousePos });
+    end.x = snapToGrid(end.x);
+    end.y = snapToGrid(end.y);
+
+    const a = worldToScreen(drawStart.x, drawStart.y);
+    const b = worldToScreen(end.x, end.y);
+
+    if (tool === 'wall') {
+      ctx.lineCap = 'square';
+      ctx.lineWidth = thick;
+      ctx.strokeStyle = 'rgba(44,40,37,0.4)';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+      // Live dimension label
+      const len = Math.round(Math.sqrt((end.x - drawStart.x) ** 2 + (end.y - drawStart.y) ** 2));
+      if (len > 0) {
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        const angle = Math.atan2(b.y - a.y, b.x - a.x);
+        const perp = angle + Math.PI / 2;
+        const offset = 18;
+        const lx = mx + Math.cos(perp) * offset;
+        const ly = my + Math.sin(perp) * offset;
+        const label = `${len} cm`;
+
+        ctx.save();
+        ctx.font = `bold ${Math.max(11, 12 * scaleFactor)}px Space Mono, monospace`;
+        const tw = ctx.measureText(label).width;
+        // Background pill
+        ctx.fillStyle = '#c8501a';
+        ctx.beginPath();
+        ctx.roundRect(lx - tw / 2 - 6, ly - 10, tw + 12, 20, 4);
+        ctx.fill();
+        // Text
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, lx, ly);
+        ctx.restore();
+
+        // Start point dot
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#c8501a';
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function drawDimension(ctx, a, b, x1, y1, x2, y2) {
+  const len = Math.round(Math.sqrt((x2-x1)**2 + (y2-y1)**2));
+  if (len === 0) return;
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const angle = Math.atan2(dy, dx);
+  const perp = angle + Math.PI / 2;
+  const offset = 14;
+  const ox = Math.cos(perp) * offset;
+  const oy = Math.sin(perp) * offset;
+
+  ctx.save();
+  ctx.strokeStyle = '#c8501a';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + ox, a.y + oy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + ox, b.y + oy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(a.x + ox, a.y + oy); ctx.lineTo(b.x + ox, b.y + oy); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.translate(mx + ox, my + oy);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#c8501a';
+  ctx.font = `${Math.max(9, 10 * scaleFactor)}px Space Mono, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`${len} cm`, 0, -2);
+  ctx.restore();
+}
+
+function drawDoor(d) {
+  const p = worldToScreen(d.x, d.y);
+  const size = (80 / gridCm) * gridPx * scaleFactor;
+  const thick = (wallThick / gridCm) * gridPx * scaleFactor;
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(d.angle || 0);
+  ctx.strokeStyle = selectedEl === d ? '#c8501a' : '#7a6e5f';
+  ctx.lineWidth = thick;
+  ctx.fillStyle = 'var(--paper)';
+  ctx.fillRect(-thick / 2, -thick / 2, thick, size);
+  ctx.strokeRect(-thick / 2, -thick / 2, thick, size);
+
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 2]);
+  ctx.beginPath();
+  ctx.arc(0, 0, size, 0, Math.PI / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawWindow(w) {
+  const p = worldToScreen(w.x, w.y);
+  const thick = (wallThick / gridCm) * gridPx * scaleFactor;
+  const wlen = (80 / gridCm) * gridPx * scaleFactor;
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(w.angle || 0);
+  ctx.fillStyle = '#d4ecf7';
+  ctx.fillRect(-wlen / 2, -thick / 2, wlen, thick);
+  ctx.strokeStyle = selectedEl === w ? '#c8501a' : '#5b8fa8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-wlen / 2, -thick / 2, wlen, thick);
+
+  // Glass lines
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#8bbcd4';
+  ctx.beginPath(); ctx.moveTo(0, -thick / 2); ctx.lineTo(0, thick / 2); ctx.stroke();
+  ctx.restore();
+}
+
+// ---- Interaction ----
+let isShiftHeld = false;
+window.addEventListener('keydown', e => {
+  if (e.key === 'Shift') isShiftHeld = true;
+  if (e.key === ' ') { spaceDown = true; mainCanvas.style.cursor = 'grab'; e.preventDefault(); }
+  if (e.key === 'Escape') { drawing = false; drawStart = null; pendingRoom = null; drawAll(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); }
+});
+window.addEventListener('keyup', e => {
+  if (e.key === 'Shift') isShiftHeld = false;
+  if (e.key === ' ') { spaceDown = false; mainCanvas.style.cursor = 'crosshair'; }
+});
+
+function snapOrthogonal(start, end) {
+  const dx = Math.abs(end.x - start.x);
+  const dy = Math.abs(end.y - start.y);
+  if (dx > dy) return { x: end.x, y: start.y };
+  else return { x: start.x, y: end.y };
+}
+
+function snapAngle(start, end) {
+  if (isShiftHeld) return snapOrthogonal(start, end);
+  return end;
+}
+
+mainCanvas.addEventListener('mousemove', e => {
+  const rect = mainCanvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+
+  if (isPanning) {
+    panX += sx - panStart.x;
+    panY += sy - panStart.y;
+    panStart = { x: sx, y: sy };
+    drawAll();
+    return;
+  }
+
+  const world = screenToWorld(sx, sy);
+  mousePos = { x: snapToGrid(world.x), y: snapToGrid(world.y) };
+
+  const bar = document.getElementById('coords-bar');
+  bar.textContent = `x: ${mousePos.x} cm  |  y: ${mousePos.y} cm`;
+
+  if (drawing) drawAll();
+});
+
+mainCanvas.addEventListener('mousedown', e => {
+  const rect = mainCanvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+
+  if (e.button === 1 || spaceDown) {
+    isPanning = true;
+    panStart = { x: sx, y: sy };
+    mainCanvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (e.button !== 0) return;
+
+  const world = screenToWorld(sx, sy);
+  const pos = { x: snapToGrid(world.x), y: snapToGrid(world.y) };
+
+  if (pendingRoom) {
+    labels.push({ ...pendingRoom, x: pos.x, y: pos.y });
+    rooms.push({ ...pendingRoom, x: pos.x, y: pos.y });
+    pendingRoom = null;
+    mainCanvas.style.cursor = 'crosshair';
+    updateRoomList();
+    drawAll();
+    return;
+  }
+
+  if (tool === 'wall') {
+    if (!drawing) {
+      drawing = true;
+      drawStart = pos;
+    } else {
+      let end = snapAngle(drawStart, { ...pos });
+      end.x = snapToGrid(end.x);
+      end.y = snapToGrid(end.y);
+      walls.push({ x1: drawStart.x, y1: drawStart.y, x2: end.x, y2: end.y });
+      drawStart = end; // continue chain
+      drawAll();
+    }
+  } else if (tool === 'door') {
+    doors.push({ x: pos.x, y: pos.y, angle: 0 });
+    drawAll();
+  } else if (tool === 'window') {
+    windows_.push({ x: pos.x, y: pos.y, angle: Math.PI / 2 });
+    drawAll();
+  } else if (tool === 'select') {
+    selectedEl = findNearest(pos);
+    updateSelInfo();
+    drawAll();
+  } else if (tool === 'erase') {
+    const el = findNearest(pos);
+    if (el) remove(el);
+    drawAll();
+  }
+});
+
+mainCanvas.addEventListener('mouseup', e => {
+  if (e.button === 1 || spaceDown) {
+    isPanning = false;
+    mainCanvas.style.cursor = spaceDown ? 'grab' : 'crosshair';
+  }
+});
+
+mainCanvas.addEventListener('dblclick', () => {
+  drawing = false; drawStart = null; drawAll();
+});
+
+mainCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = mainCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  scaleFactor *= factor;
+  scaleFactor = Math.max(0.2, Math.min(8, scaleFactor));
+  panX = mx - (mx - panX) * factor;
+  panY = my - (my - panY) * factor;
+  drawAll();
+}, { passive: false });
+
+function zoom(f) {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  const mx = W / 2, my = H / 2;
+  scaleFactor *= f;
+  scaleFactor = Math.max(0.2, Math.min(8, scaleFactor));
+  panX = mx - (mx - panX) * f;
+  panY = my - (my - panY) * f;
+  drawAll();
+}
+
+function resetView() {
+  scaleFactor = 1; panX = 60; panY = 60; drawAll();
+}
+
+function findNearest(pos) {
+  let best = null, bestDist = 30;
+  for (const w of walls) {
+    const d = distToSegment(pos, { x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 });
+    if (d < bestDist) { bestDist = d; best = w; }
+  }
+  for (const d of doors) {
+    const dist = Math.hypot(pos.x - d.x, pos.y - d.y);
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  }
+  for (const w of windows_) {
+    const dist = Math.hypot(pos.x - w.x, pos.y - w.y);
+    if (dist < bestDist) { bestDist = dist; best = w; }
+  }
+  for (const r of rooms) {
+    const dist = Math.hypot(pos.x - r.x, pos.y - r.y);
+    if (dist < bestDist + 20) { bestDist = dist; best = r; }
+  }
+  return best;
+}
+
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function remove(el) {
+  walls = walls.filter(w => w !== el);
+  doors = doors.filter(d => d !== el);
+  windows_ = windows_.filter(w => w !== el);
+  rooms = rooms.filter(r => r !== el);
+  if (selectedEl === el) selectedEl = null;
+  updateRoomList();
+  updateSelInfo();
+}
+
+function deleteSelected() {
+  if (selectedEl) { remove(selectedEl); drawAll(); }
+}
+
+function updateSelInfo() {
+  const box = document.getElementById('sel-info');
+  if (!selectedEl) { box.innerHTML = 'Kliknij element, aby zobaczyć wymiary.'; return; }
+  if (selectedEl.x1 !== undefined) {
+    const len = Math.round(Math.sqrt((selectedEl.x2-selectedEl.x1)**2 + (selectedEl.y2-selectedEl.y1)**2));
+    const t = document.getElementById('wall-thick').value;
+    box.innerHTML = `<b>Ściana</b><br>Długość: <b>${len} cm</b><br>Grubość: <b>${t} cm</b><br>
+      Od: (${selectedEl.x1}, ${selectedEl.y1})<br>Do: (${selectedEl.x2}, ${selectedEl.y2})`;
+  } else if (selectedEl.name) {
+    box.innerHTML = `<b>Pomieszczenie</b><br>Nazwa: <b>${selectedEl.name}</b>`;
+  } else {
+    box.innerHTML = `<b>Element</b><br>Pozycja: (${selectedEl.x}, ${selectedEl.y})`;
+  }
+}
+
+// Rooms
+function openRoomModal() {
+  document.getElementById('room-modal').classList.add('open');
+}
+function closeRoomModal() {
+  document.getElementById('room-modal').classList.remove('open');
+}
+function confirmRoom() {
+  const name = document.getElementById('room-name').value || 'Pomieszczenie';
+  const color = document.getElementById('room-color').value;
+  pendingRoom = { name, color };
+  closeRoomModal();
+  mainCanvas.style.cursor = 'cell';
+}
+
+function updateRoomList() {
+  const list = document.getElementById('room-list');
+  list.innerHTML = '';
+  for (const r of rooms) {
+    const div = document.createElement('div');
+    div.className = 'room-item' + (selectedEl === r ? ' selected' : '');
+    div.innerHTML = `<span style="color:${r.color};font-weight:600;">${r.name}</span>
+      <button class="del-room" onclick="removeRoomByRef(event, rooms[${rooms.indexOf(r)}])">×</button>`;
+    div.onclick = () => { selectedEl = r; updateSelInfo(); updateRoomList(); drawAll(); };
+    list.appendChild(div);
+  }
+}
+
+function removeRoomByRef(e, r) {
+  e.stopPropagation();
+  remove(r);
+  drawAll();
+  updateRoomList();
+}
+
+function clearAll() {
+  if (confirm('Czy na pewno chcesz wyczyścić cały rzut?')) {
+    walls = []; doors = []; windows_ = []; rooms = []; labels = [];
+    selectedEl = null; drawing = false; drawStart = null;
+    updateRoomList(); updateSelInfo(); drawAll();
+  }
+}
+
+function exportPNG() {
+  const offscreen = document.createElement('canvas');
+  offscreen.width = mainCanvas.width;
+  offscreen.height = mainCanvas.height;
+  const oc = offscreen.getContext('2d');
+  oc.fillStyle = '#f0ede8';
+  oc.fillRect(0, 0, offscreen.width, offscreen.height);
+  oc.drawImage(gridCanvas, 0, 0);
+  oc.drawImage(mainCanvas, 0, 0);
+  const link = document.createElement('a');
+  link.download = 'rzut-mieszkania.png';
+  link.href = offscreen.toDataURL('image/png');
+  link.click();
+}
+
+// Init
+resetView();
+</script>
+</body>
+</html>
